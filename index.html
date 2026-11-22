@@ -60,6 +60,7 @@ body{background-image:radial-gradient(900px 500px at 50% -10%,color-mix(in srgb,
 .credit{color:var(--gold);font-size:1.2rem}
 .ar{text-shadow:0 1px 0 color-mix(in srgb,var(--gold) 12%,transparent)}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js"></script>
 </head>
 <body>
 <main>
@@ -70,7 +71,8 @@ body{background-image:radial-gradient(900px 500px at 50% -10%,color-mix(in srgb,
   <div class="row"><span>إيقاع التلاوة:</span>
     <select id="pace"><option value="1">هادئ</option><option value="1.7" selected>بطيء</option><option value="2.4">بطيء جدًا</option></select>
   </div>
-  <div class="row"><span>التنبيه الصوتي:</span><select id="snd"><option value="1" selected>صوت ونبرة</option><option value="0">بدون صوت</option></select></div>
+  <div class="row"><span>التنبيه الصوتي:</span><select id="snd"><option value="1" selected>نبرة وصوت</option><option value="2">نبرة فقط</option><option value="0">بدون صوت</option></select></div>
+  <button class="chip" id="tst" style="display:block;margin:0 auto 10px">🔔 جرّب الصوت</button>
   <button class="go" id="start">ابدأ الصلاة</button>
   <p class="fine">اضغط ابدأ مرة واحدة، ثم ضع الجوال أمامك على الأرض بصوت مرتفع قليلًا. سيمشي وحده وينبّهك عند كل انتقال (ركوع، سجود، جلوس…).</p>
   <p class="fine" style="color:var(--gold);font-size:1rem">تصميم وبرمجة عبدالعزيز الأمير · لا تنسونا من صالح دعائكم</p>
@@ -151,16 +153,23 @@ let steps=[],i=0,auto=false,timer=null,pace=1.7,sel='fajr';
 const $=id=>document.getElementById(id);
 const chips=$('chips');
 Object.keys(P).forEach(k=>{const b=document.createElement('button');b.className='chip'+(k===sel?' on':'');b.textContent=P[k][0];b.onclick=()=>{sel=k;[...chips.children].forEach(c=>c.classList.remove('on'));b.classList.add('on')};chips.appendChild(b)});
-$('start').onclick=()=>{pace=parseFloat($('pace').value);steps=build(P[sel][1]);i=0;auto=true;$('auto').textContent='إيقاف مؤقت';initAudio();keepAwake();$('home').classList.add('hide');$('run').classList.remove('hide');show()};
-$('exit').onclick=e=>{e.preventDefault();stop();$('run').classList.add('hide');$('home').classList.remove('hide')};
+$('start').onclick=()=>{pace=parseFloat($('pace').value);steps=build(P[sel][1]);i=0;auto=true;$('auto').textContent='إيقاف مؤقت';initAudio();unlockAudio();keepAwake();$('home').classList.add('hide');$('run').classList.remove('hide');show()};
+$('exit').onclick=e=>{e.preventDefault();stop();try{NS&&NS.disable();wl&&wl.release()}catch(x){}$('run').classList.add('hide');$('home').classList.remove('hide')};
 function stop(){clearTimeout(timer);auto=false;$('auto').textContent='تشغيل تلقائي';try{speechSynthesis.cancel()}catch(e){}}
 let ac=null,wl=null;
 function initAudio(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}
-async function keepAwake(){try{wl=await navigator.wakeLock.request('screen')}catch(e){}}
+let NS=null;
+async function keepAwake(){try{if(typeof NoSleep!=='undefined'){NS=NS||new NoSleep();NS.enable()}}catch(e){}try{wl=await navigator.wakeLock.request('screen')}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!$('run').classList.contains('hide'))keepAwake()});
 function beep(){if(!ac||$('snd').value==='0')return;try{const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=528;g.gain.setValueAtTime(.0001,ac.currentTime);g.gain.exponentialRampToValueAtTime(.25,ac.currentTime+.05);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.8);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.85)}catch(e){}}
 function beep(){if(!ac||$('snd').value==='0')return;try{const t=ac.currentTime;[[523.25,0],[783.99,.14]].forEach(([f,d])=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.0001,t+d);g.gain.exponentialRampToValueAtTime(.08,t+d+.05);g.gain.exponentialRampToValueAtTime(.0001,t+d+1.4);o.connect(g);g.connect(ac.destination);o.start(t+d);o.stop(t+d+1.5)})}catch(e){}}
 function svg(t){const k=/الرفع/.test(t)?'q':/الركوع/.test(t)?'r':/السجود/.test(t)?'j':/الجلسة|التشهد|الإبراهيمية|السلام|الاستغفار|تقبّل/.test(t)?'s':'q';const D={q:'<path d="M40 21V41M40 22L33 30L41 31M40 41L36 57M40 41L44 57"/><circle cx="40" cy="14" r="6"/>',r:'<path d="M28 32H56M28 32V56M54 32L50 48"/><circle cx="63" cy="30" r="6"/>',j:'<path d="M8 58H74M32 34L56 46M32 34L26 52L40 56M54 46L60 56"/><circle cx="62" cy="49" r="6"/>',s:'<path d="M40 22V44M40 44L28 56H52L40 44M40 28L34 42"/><circle cx="40" cy="14" r="6"/>'};return '<svg viewBox="0 0 80 64" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">'+D[k]+'</svg>'}
+let AU=null;
+function makeWav(){const sr=22050,n=Math.floor(sr*.9),b=new ArrayBuffer(44+n*2),v=new DataView(b);const w=(o,s)=>{for(let k=0;k<s.length;k++)v.setUint8(o+k,s.charCodeAt(k))};w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);for(let k=0;k<n;k++){const t=k/sr,e=Math.exp(-t*5.5)*Math.min(1,t*60);const s=(Math.sin(2*Math.PI*660*t)+.4*Math.sin(2*Math.PI*990*t))*e*.32;v.setInt16(44+k*2,Math.max(-1,Math.min(1,s))*32767,true)}return URL.createObjectURL(new Blob([b],{type:'audio/wav'}))}
+function webBeep(){try{if(!ac)initAudio();if(ac.resume)ac.resume();const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();o.frequency.value=660;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.15,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+.9);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+1)}catch(e){}}
+function unlockAudio(){try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}try{if(!AU){AU=new Audio(makeWav());AU.preload='auto'}const p=AU.play();if(p&&p.catch)p.catch(()=>{})}catch(e){}try{if(ac&&ac.state==='suspended')ac.resume()}catch(e){}}
+function beep(){if($('snd').value==='0')return;try{if(navigator.vibrate)navigator.vibrate(40)}catch(e){}try{if(!AU)AU=new Audio(makeWav());AU.currentTime=0;const p=AU.play();if(p&&p.catch)p.catch(webBeep)}catch(e){webBeep()}}
+$('tst').onclick=()=>{initAudio();unlockAudio();beep()};
 function cue(s){
   if($('snd').value==='0')return;
   let t=s.t;
@@ -168,7 +177,7 @@ function cue(s){
   try{speechSynthesis.cancel()}catch(e){}
   if(t===null)return;
   beep();
-  setTimeout(()=>{try{const u=new SpeechSynthesisUtterance(t);u.lang='ar-SA';u.rate=.8;u.volume=.7;speechSynthesis.speak(u)}catch(e){}},700);
+  setTimeout(()=>{if($('snd').value!=='1')return;try{const u=new SpeechSynthesisUtterance(t);u.lang='ar-SA';u.rate=.8;u.volume=.7;speechSynthesis.speak(u)}catch(e){}},700);
 }
 function show(){
   clearTimeout(timer);
